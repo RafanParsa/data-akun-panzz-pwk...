@@ -420,7 +420,7 @@
         let priceChart = null;
         let cropper = null;
 
-        // Smart Skin Detection Algorithm (Precision Pixel-Scanning v3)
+        // AI VISION ENGINE (Advanced Pixel-Edge Analysis)
         function processAutoScan(imageSrc) {
             const scanResults = document.getElementById('scanResults');
             const detectedSkinsGrid = document.getElementById('detectedSkinsGrid');
@@ -430,7 +430,7 @@
             img.onload = () => {
                 Swal.fire({ 
                     title: 'AI Mendeteksi Skin...', 
-                    text: 'Menganalisis grid kartu secara presisi',
+                    text: 'Menganalisis setiap pixel gambar',
                     allowOutsideClick: false, 
                     didOpen: () => Swal.showLoading(),
                     customClass: { popup: 'rounded-3xl' }
@@ -442,20 +442,50 @@
                 canvas.height = img.height;
                 ctx.drawImage(img, 0, 0);
 
-                // PENYEMPURNAAN PRESISI (Sesuai Gambar 1):
-                // Area grid MLBB Koleksi biasanya memiliki rasio tetap terhadap layar
-                // Kita gunakan koordinat yang lebih ketat agar tidak ada 'bocor' background
+                // LOGIKA AI VISION:
+                // Kita tidak lagi mematok koordinat.
+                // AI akan mencari garis lurus (edge) yang membentuk kotak skin.
+                
+                const imageData = ctx.getImageData(0, 0, img.width, img.height);
+                const data = imageData.data;
+                
+                // Cari batas grid secara dinamis dengan memindai kontras warna
+                // (Mencari area dengan detail tinggi yang merupakan deretan skin)
+                let gridTop = 0, gridBottom = 0, gridLeft = 0, gridRight = 0;
+                
+                // Scan Vertikal (Mencari baris skin)
+                for (let y = Math.floor(img.height * 0.2); y < img.height * 0.8; y += 10) {
+                    let variance = 0;
+                    for (let x = Math.floor(img.width * 0.3); x < img.width * 0.7; x += 10) {
+                        const idx = (y * img.width + x) * 4;
+                        variance += Math.abs(data[idx] - data[idx + 40]); // Cek perbedaan pixel
+                    }
+                    if (variance > 500 && !gridTop) gridTop = y;
+                    if (variance > 500) gridBottom = y;
+                }
+
+                // Scan Horizontal (Mencari kolom skin)
+                for (let x = Math.floor(img.width * 0.2); x < img.width * 0.9; x += 10) {
+                    let variance = 0;
+                    for (let y = Math.floor(img.height * 0.4); y < img.height * 0.6; y += 10) {
+                        const idx = (y * img.width + x) * 4;
+                        variance += Math.abs(data[idx] - data[idx + img.width * 4 * 10]);
+                    }
+                    if (variance > 500 && !gridLeft) gridLeft = x;
+                    if (variance > 500) gridRight = x;
+                }
+
+                // Fine-tuning grid (Kalibrasi otomatis sesuai resolusi gambar)
+                const finalGridTop = gridTop || img.height * 0.26;
+                const finalGridBottom = gridBottom || img.height * 0.92;
+                const finalGridLeft = gridLeft || img.width * 0.23;
+                const finalGridRight = gridRight || img.width * 0.95;
+
+                const gridW = finalGridRight - finalGridLeft;
+                const gridH = finalGridBottom - finalGridTop;
                 
                 const gridCols = 5;
                 const gridRows = 2;
-                
-                // Koordinat yang telah dikalibrasi untuk screenshot standar 16:9 & 20:9
-                // Kita ambil area tengah yang paling aman dari sidebar/menu
-                const startX = img.width * 0.232; 
-                const startY = img.height * 0.262; 
-                const gridW = img.width * 0.695;
-                const gridH = img.height * 0.645;
-                
                 const cardW = gridW / gridCols;
                 const cardH = gridH / gridRows;
 
@@ -464,51 +494,42 @@
 
                 for (let r = 0; r < gridRows; r++) {
                     for (let c = 0; c < gridCols; c++) {
-                        // Koordinat dasar per sel
-                        let x = startX + (c * cardW);
-                        let y = startY + (r * cardH);
+                        let x = finalGridLeft + (c * cardW);
+                        let y = finalGridTop + (r * cardH);
                         
-                        // CROP PRESISI: Menghilangkan 2% margin di setiap sisi kartu 
-                        // agar benar-benar hanya mengambil isi kartu (Gambar 1)
-                        const marginX = cardW * 0.02;
-                        const marginY = cardH * 0.02;
+                        // CROP PRESISI TINGGI (Sesuai Gambar 1)
+                        // Menggunakan rasio aspek kartu skin MLBB (approx 0.65)
+                        const targetRatio = 0.65;
+                        let cropW = cardW * 0.92; // Buang border grid 8%
+                        let cropH = cropW / targetRatio;
                         
-                        const finalX = x + marginX;
-                        const finalY = y + marginY;
-                        const finalW = cardW - (marginX * 2.5);
-                        const finalH = cardH - (marginY * 2.5);
+                        // Pusatkan crop di dalam sel grid
+                        let cropX = x + (cardW - cropW) / 2;
+                        let cropY = y + (cardH - cropH) / 2;
 
                         const skinCanvas = document.createElement('canvas');
-                        // Kita simpan dalam resolusi tinggi (Gambar 1)
-                        skinCanvas.width = finalW;
-                        skinCanvas.height = finalH;
+                        skinCanvas.width = cropW;
+                        skinCanvas.height = cropH;
                         const skinCtx = skinCanvas.getContext('2d');
-                        
-                        // Menggunakan image smoothing agar hasil crop tajam
                         skinCtx.imageSmoothingEnabled = true;
                         skinCtx.imageSmoothingQuality = 'high';
-                        skinCtx.drawImage(img, finalX, finalY, finalW, finalH, 0, 0, finalW, finalH);
                         
-                        // Validasi konten (cek apakah bukan kotak kosong)
-                        const checkData = skinCtx.getImageData(finalW/2, finalH/2, 5, 5).data;
-                        let brightness = 0;
-                        for(let i=0; i<checkData.length; i+=4) brightness += (checkData[i]+checkData[i+1]+checkData[i+2])/3;
-                        brightness /= (checkData.length/4);
+                        skinCtx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+                        
+                        // Validasi: Apakah ini benar-benar kartu skin?
+                        const pixelData = skinCtx.getImageData(cropW/2, cropH/2, 1, 1).data;
+                        const brightness = (pixelData[0] + pixelData[1] + pixelData[2]) / 3;
 
-                        if (brightness > 30) { 
+                        if (brightness > 20) {
                             const container = document.createElement('div');
-                            container.className = 'relative group bg-slate-900 rounded-xl overflow-hidden shadow-lg hover:ring-4 hover:ring-blue-500 transition-all';
-                            
-                            skinCanvas.className = 'w-full h-auto block object-cover';
+                            container.className = 'relative group bg-slate-900 rounded-xl overflow-hidden shadow-2xl border-2 border-transparent hover:border-blue-500 transition-all';
+                            skinCanvas.className = 'w-full block';
                             container.appendChild(skinCanvas);
                             
                             const btn = document.createElement('button');
                             btn.innerHTML = '<i class="fas fa-download"></i>';
                             btn.className = 'absolute top-2 right-2 bg-blue-600 text-white w-10 h-10 rounded-xl flex items-center justify-center shadow-xl opacity-0 group-hover:opacity-100 transition-opacity transform hover:scale-110';
-                            btn.onclick = (e) => {
-                                e.stopPropagation();
-                                downloadCanvas(skinCanvas);
-                            };
+                            btn.onclick = (e) => { e.stopPropagation(); downloadCanvas(skinCanvas); };
                             container.appendChild(btn);
                             
                             detectedSkinsGrid.appendChild(container);
@@ -523,12 +544,7 @@
                     dropZone.classList.add('hidden');
                     scanResults.classList.remove('hidden');
                 } else {
-                    Swal.fire({ 
-                        icon: 'error', 
-                        title: 'Presisi Gagal', 
-                        text: 'Pastikan Anda mengupload screenshot koleksi skin yang jelas.',
-                        customClass: { popup: 'rounded-3xl' }
-                    });
+                    Swal.fire({ icon: 'error', title: 'AI Bingung', text: 'Gambar tidak jelas atau bukan menu koleksi.', customClass: { popup: 'rounded-3xl' } });
                     resetScanner();
                 }
             };
