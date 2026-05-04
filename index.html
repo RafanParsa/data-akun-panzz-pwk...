@@ -8,9 +8,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Cropper.js -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <!-- OpenCV.js dimuat secara dinamis -->
+    <script async src="https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.6.0.1/dist/opencv.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
@@ -296,8 +295,8 @@
                         <h2 class="text-2xl font-bold text-slate-800">AI Skin Scanner</h2>
                         <p class="text-slate-500">Gunakan AI untuk mendeteksi dan memotong semua kartu skin secara otomatis.</p>
                     </div>
-                    <div id="scannerStatus" class="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
-                        <i class="fas fa-check-circle"></i> <span>AI AUTO-SCAN ACTIVE</span>
+                    <div id="scannerStatus" class="flex items-center gap-2 text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
+                        <i class="fas fa-spinner fa-spin" id="aiStatusIcon"></i> <span id="aiStatusText">AI LOADING...</span>
                     </div>
                 </div>
 
@@ -420,7 +419,27 @@
         let priceChart = null;
         let cropper = null;
 
-        // AI HISTOGRAM PROJECTION ENGINE (True Computer Vision)
+        let isOpenCvReady = false;
+
+        // OpenCV Ready Hook
+        var cv = {
+            onRuntimeInitialized: () => {
+                isOpenCvReady = true;
+                const statusDiv = document.getElementById('scannerStatus');
+                const statusIcon = document.getElementById('aiStatusIcon');
+                const statusText = document.getElementById('aiStatusText');
+                
+                statusDiv.classList.replace('text-slate-400', 'text-emerald-600');
+                statusDiv.classList.replace('bg-slate-100', 'bg-emerald-50');
+                statusIcon.classList.replace('fa-spinner', 'fa-check-circle');
+                statusIcon.classList.remove('fa-spin');
+                statusText.innerText = 'AI READY';
+                
+                console.log('OpenCV.js is ready.');
+            }
+        };
+
+        // Smart Skin Detection Algorithm (OpenCV Auto-Scan)
         function processAutoScan(imageSrc) {
             const scanResults = document.getElementById('scanResults');
             const detectedSkinsGrid = document.getElementById('detectedSkinsGrid');
@@ -429,109 +448,63 @@
             const img = new Image();
             img.onload = () => {
                 Swal.fire({ 
-                    title: 'AI Memindai Grid...', 
-                    text: 'Menganalisis struktur layout secara cerdas',
+                    title: 'AI Memindai Gambar...', 
+                    text: 'Mendeteksi letak skin secara otomatis',
                     allowOutsideClick: false, 
                     didOpen: () => Swal.showLoading(),
                     customClass: { popup: 'rounded-3xl' }
                 });
-
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                ctx.drawImage(img, 0, 0);
-
-                const imageData = ctx.getImageData(0, 0, img.width, img.height);
-                const data = imageData.data;
-
-                // 1. ANALISIS HISTOGRAM (Mencari celah antar kartu secara visual)
-                const horizontalVariance = new Array(img.width).fill(0);
-                const verticalVariance = new Array(img.height).fill(0);
-
-                // Scan variance untuk menemukan kolom
-                for (let x = 0; x < img.width; x += 2) {
-                    for (let y = Math.floor(img.height * 0.3); y < img.height * 0.8; y += 5) {
-                        const idx = (y * img.width + x) * 4;
-                        const diff = Math.abs(data[idx] - data[idx + 4]);
-                        horizontalVariance[x] += diff;
-                    }
-                }
-
-                // Scan variance untuk menemukan baris
-                for (let y = 0; y < img.height; y += 2) {
-                    for (let x = Math.floor(img.width * 0.3); x < img.width * 0.8; x += 5) {
-                        const idx = (y * img.width + x) * 4;
-                        const diff = Math.abs(data[idx] - data[idx + img.width * 4]);
-                        verticalVariance[y] += diff;
-                    }
-                }
-
-                // 2. DETEKSI BATAS (Mencari lonjakan detail yang menandakan kartu skin)
-                let startX = 0, endX = 0, startY = 0, endY = 0;
-                const threshold = 1000;
-
-                for (let x = Math.floor(img.width * 0.1); x < img.width * 0.9; x++) {
-                    if (horizontalVariance[x] > threshold && !startX) startX = x;
-                    if (horizontalVariance[x] > threshold) endX = x;
-                }
-
-                for (let y = Math.floor(img.height * 0.1); y < img.height * 0.9; y++) {
-                    if (verticalVariance[y] > threshold && !startY) startY = y;
-                    if (verticalVariance[y] > threshold) endY = y;
-                }
-
-                // Jika AI gagal menemukan grid, gunakan kalibrasi aman
-                startX = startX || img.width * 0.23;
-                endX = endX || img.width * 0.95;
-                startY = startY || img.height * 0.26;
-                endY = endY || img.height * 0.92;
-
-                const gridW = endX - startX;
-                const gridH = endY - startY;
-                const gridCols = 5;
-                const gridRows = 2;
-                const cardW = gridW / gridCols;
-                const cardH = gridH / gridRows;
-
+                
+                const src = cv.imread(img);
+                const gray = new cv.Mat();
+                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+                
+                // Canny Edge Detection untuk grid
+                const edges = new cv.Mat();
+                cv.Canny(gray, edges, 50, 150, 3);
+                
+                const M = cv.Mat.ones(3, 3, cv.CV_8U);
+                const dilated = new cv.Mat();
+                cv.dilate(edges, dilated, M);
+                
+                const contours = new cv.Hierarchy();
+                const hierarchy = new cv.Hierarchy();
+                cv.findContours(dilated, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+                
                 detectedSkinsGrid.innerHTML = '';
                 let count = 0;
+                let foundRects = [];
 
-                for (let r = 0; r < gridRows; r++) {
-                    for (let c = 0; c < gridCols; c++) {
-                        let x = startX + (c * cardW);
-                        let y = startY + (r * cardH);
-                        
-                        // CROP PRESISI TINGGI (Sesuai Gambar 1)
-                        // Buang padding 10% untuk benar-benar masuk ke dalam kotak kartu
-                        const paddingX = cardW * 0.08;
-                        const paddingY = cardH * 0.06;
-                        
-                        const cropW = cardW - (paddingX * 2);
-                        const cropH = cardH - (paddingY * 2);
-                        const cropX = x + paddingX;
-                        const cropY = y + paddingY;
+                for (let i = 0; i < contours.size(); ++i) {
+                    const cnt = contours.get(i);
+                    const rect = cv.boundingRect(cnt);
+                    const aspectRatio = rect.width / rect.height;
+                    
+                    // Filter: Skin ML biasanya 0.5 - 0.9 aspek rasionya
+                    const isCorrectRatio = aspectRatio > 0.45 && aspectRatio < 0.85;
+                    const isCorrectSize = rect.width > img.width * 0.05 && rect.height > img.height * 0.1;
+                    
+                    if (isCorrectRatio && isCorrectSize) {
+                        const isDuplicate = foundRects.some(r => 
+                            Math.abs(r.x - rect.x) < 20 && Math.abs(r.y - rect.y) < 20
+                        );
 
-                        const skinCanvas = document.createElement('canvas');
-                        skinCanvas.width = cropW;
-                        skinCanvas.height = cropH;
-                        const skinCtx = skinCanvas.getContext('2d');
-                        skinCtx.imageSmoothingEnabled = true;
-                        skinCtx.imageSmoothingQuality = 'high';
-                        skinCtx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-                        
-                        // Cek apakah bukan kotak kosong (Nalar Pixel)
-                        const pixelData = skinCtx.getImageData(cropW/2, cropH/2, 1, 1).data;
-                        if ((pixelData[0]+pixelData[1]+pixelData[2])/3 > 25) {
+                        if (!isDuplicate) {
+                            foundRects.push(rect);
+                            const canvas = document.createElement('canvas');
+                            canvas.width = rect.width;
+                            canvas.height = rect.height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, rect.x, rect.y, rect.width, rect.height, 0, 0, rect.width, rect.height);
+                            
                             const container = document.createElement('div');
-                            container.className = 'relative group bg-slate-900 rounded-xl overflow-hidden shadow-2xl hover:scale-105 transition-all cursor-pointer';
-                            skinCanvas.className = 'w-full block';
-                            container.appendChild(skinCanvas);
+                            container.className = 'relative group bg-slate-900 rounded-xl overflow-hidden shadow-lg';
+                            container.appendChild(canvas);
                             
                             const btn = document.createElement('button');
                             btn.innerHTML = '<i class="fas fa-download"></i>';
-                            btn.className = 'absolute bottom-2 right-2 bg-blue-600 text-white w-10 h-10 rounded-xl flex items-center justify-center shadow-lg opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity';
-                            btn.onclick = (e) => { e.stopPropagation(); downloadCanvas(skinCanvas); };
+                            btn.className = 'absolute bottom-2 right-2 bg-blue-600 text-white w-8 h-8 rounded-lg flex items-center justify-center shadow-lg';
+                            btn.onclick = () => downloadCanvas(canvas);
                             container.appendChild(btn);
                             
                             detectedSkinsGrid.appendChild(container);
@@ -540,33 +513,39 @@
                     }
                 }
 
+                src.delete(); gray.delete(); edges.delete(); dilated.delete(); M.delete(); contours.delete(); hierarchy.delete();
+                
                 Swal.close();
                 if (count > 0) {
                     document.getElementById('detectedCount').innerText = count;
                     dropZone.classList.add('hidden');
                     scanResults.classList.remove('hidden');
                 } else {
-                    Swal.fire({ icon: 'error', title: 'AI Tidak Menemukan Skin', text: 'Pastikan gambar adalah screenshot menu Koleksi Skin.', customClass: { popup: 'rounded-3xl' } });
+                    Swal.fire({ icon: 'warning', title: 'AI Tidak Menemukan Skin', text: 'Coba screenshot ulang dengan tampilan menu koleksi yang jelas.', customClass: { popup: 'rounded-3xl' } });
                 }
             };
             img.src = imageSrc;
         }
 
-        // Inisialisasi Event Listeners
+        // Event Listeners
         window.addEventListener('load', () => {
             const imageInput = document.getElementById('imageInput');
             const dropZone = document.getElementById('dropZone');
             
             if (dropZone && imageInput) {
-                dropZone.onclick = () => imageInput.click();
+                dropZone.onclick = () => {
+                    if (!isOpenCvReady) {
+                        Swal.fire({ title: 'AI Masih Loading', text: 'Tunggu sebentar sampai muncul tanda AI READY.', icon: 'info', customClass: { popup: 'rounded-3xl' } });
+                        return;
+                    }
+                    imageInput.click();
+                };
                 
                 imageInput.onchange = (e) => {
                     const file = e.target.files[0];
                     if (!file) return;
                     const reader = new FileReader();
-                    reader.onload = (event) => {
-                        processAutoScan(event.target.result);
-                    };
+                    reader.onload = (event) => processAutoScan(event.target.result);
                     reader.readAsDataURL(file);
                 };
             }
