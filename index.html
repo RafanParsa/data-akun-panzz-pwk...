@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panzz Store - Dashboard Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Cropper.js -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .sidebar-link.active {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .section { display: none; }
+        .section.active { display: block; }
+        .recommendation-card {
+            transition: all 0.3s ease;
+        }
+        .recommendation-card:hover {
+            transform: translateY(-2px);
+        }
+        .cropper-container {
+            max-height: 500px !important;
+        }
+        #detectedSkinsGrid canvas {
+            width: 100%;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            transition: transform 0.2s;
+        }
+        #detectedSkinsGrid canvas:hover {
+            transform: scale(1.05);
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+    <!-- Login Page -->
+    <div id="loginPage" class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-white p-10 rounded-3xl shadow-2xl w-full max-w-md border border-slate-100">
+            <div class="text-center mb-10">
+                <div class="bg-blue-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-200">
+                    <i class="fas fa-gamepad text-white text-3xl"></i>
+                </div>
+                <h1 class="text-3xl font-bold text-slate-800 mb-2">Panzz Store</h1>
+                <p class="text-slate-500">Silakan login untuk mengelola store</p>
+            </div>
+            <form id="loginForm" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">Username</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                            <i class="fas fa-user"></i>
+                        </span>
+                        <input type="text" id="username" required class="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">Password</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                            <i class="fas fa-lock"></i>
+                        </span>
+                        <input type="password" id="password" required class="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all">
+                    </div>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 active:scale-[0.98]">
+                    Masuk ke Dashboard
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Content Container -->
+    <div id="mainContent" class="hidden flex min-h-screen">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-white border-r border-slate-200 flex flex-col fixed h-full z-40 transition-transform lg:translate-x-0 -translate-x-full" id="sidebar">
+            <div class="p-6 flex items-center gap-3">
+                <div class="bg-blue-600 p-2 rounded-lg text-white">
+                    <i class="fas fa-gamepad"></i>
+                </div>
+                <span class="text-xl font-bold text-slate-800">Panzz Store</span>
+            </div>
+            
+            <nav class="flex-1 px-4 space-y-2 mt-4">
+                <button onclick="switchSection('dashboard')" class="sidebar-link active w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:bg-slate-50 transition-all font-medium" data-section="dashboard">
+                    <i class="fas fa-chart-pie w-5"></i> Dashboard
+                </button>
+                <button onclick="switchSection('accounts')" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:bg-slate-50 transition-all font-medium" data-section="accounts">
+                    <i class="fas fa-th-list w-5"></i> Daftar Akun
+                </button>
+                <button onclick="switchSection('stats')" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:bg-slate-50 transition-all font-medium" data-section="stats">
+                    <i class="fas fa-chart-line w-5"></i> Statistik
+                </button>
+                <button onclick="switchSection('cropper')" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:bg-slate-50 transition-all font-medium" data-section="cropper">
+                    <i class="fas fa-crop-alt w-5"></i> Skin Cropper
+                </button>
+            </nav>
+
+            <div class="p-4 border-t border-slate-100">
+                <button onclick="handleLogout()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 transition-all font-medium">
+                    <i class="fas fa-sign-out-alt w-5"></i> Keluar
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Body -->
+        <main class="flex-1 lg:ml-64 p-4 lg:p-8">
+            <!-- Mobile Toggle -->
+            <button class="lg:hidden mb-4 p-2 text-slate-600" onclick="toggleSidebar()">
+                <i class="fas fa-bars text-2xl"></i>
+            </button>
+
+            <!-- Dashboard Section -->
+            <section id="dashboardSection" class="section active space-y-8">
+                <div class="flex justify-between items-end">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-800">Ringkasan Store</h2>
+                        <p class="text-slate-500">Selamat datang kembali di panel kontrol.</p>
+                    </div>
+                    <button onclick="fetchStats()" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                        <div class="flex items-center gap-4">
+                            <div class="bg-blue-100 p-3 rounded-2xl text-blue-600">
+                                <i class="fas fa-box text-xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-slate-500 font-medium">Stok Akun</p>
+                                <h3 class="text-2xl font-bold text-slate-800" id="statTotalAccounts">0</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                        <div class="flex items-center gap-4">
+                            <div class="bg-green-100 p-3 rounded-2xl text-green-600">
+                                <i class="fas fa-check-circle text-xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-slate-500 font-medium">Ready Stock</p>
+                                <h3 class="text-2xl font-bold text-slate-800" id="statReadyAccounts">0</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                        <div class="flex items-center gap-4">
+                            <div class="bg-orange-100 p-3 rounded-2xl text-orange-600">
+                                <i class="fas fa-shopping-cart text-xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-slate-500 font-medium">Terjual</p>
+                                <h3 class="text-2xl font-bold text-slate-800" id="statSoldAccounts">0</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                        <div class="flex items-center gap-4">
+                            <div class="bg-emerald-100 p-3 rounded-2xl text-emerald-600">
+                                <i class="fas fa-money-bill-wave text-xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm text-slate-500 font-medium">Total Profit</p>
+                                <h3 class="text-2xl font-bold text-slate-800" id="statTotalProfit">Rp0</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Recommendations Section -->
+                <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 space-y-6">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-3">
+                            <div class="bg-indigo-100 p-2 rounded-lg text-indigo-600">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <h4 class="text-xl font-bold text-slate-800">Analisis Ekonomi AI</h4>
+                        </div>
+                        <span class="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-full uppercase tracking-widest">Heuristic Engine v2.0</span>
+                    </div>
+                    <div id="aiRecommendations" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 animate-pulse h-32"></div>
+                        <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 animate-pulse h-32"></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Chart Preview -->
+                    <div class="lg:col-span-2 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                        <h4 class="font-bold text-slate-800 mb-6">Status Inventori</h4>
+                        <div class="h-64">
+                            <canvas id="inventoryChart"></canvas>
+                        </div>
+                    </div>
+                    <!-- Quick Actions -->
+                    <div class="bg-blue-600 p-8 rounded-3xl shadow-lg shadow-blue-200 text-white relative overflow-hidden">
+                        <div class="relative z-10">
+                            <h4 class="text-xl font-bold mb-2">Auto Scan Skin?</h4>
+                            <p class="text-blue-100 text-sm mb-6">Gunakan fitur AI Skin Scanner untuk memotong otomatis semua kartu skin dari satu screenshot koleksi.</p>
+                            <button onclick="switchSection('cropper')" class="bg-white text-blue-600 px-6 py-3 rounded-xl font-bold text-sm hover:bg-blue-50 transition-all">
+                                Buka AI Scanner
+                            </button>
+                        </div>
+                        <i class="fas fa-magic absolute -bottom-4 -right-4 text-8xl text-blue-500 opacity-50 transform -rotate-12"></i>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Accounts Section -->
+            <section id="accountsSection" class="section space-y-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-800">Daftar Akun</h2>
+                        <p class="text-slate-500">Kelola database akun game Anda.</p>
+                    </div>
+                    <div class="flex gap-2 w-full md:w-auto">
+                        <button onclick="downloadExcel()" class="bg-green-100 text-green-600 px-4 py-2 rounded-xl font-semibold hover:bg-green-200 transition-all flex items-center gap-2">
+                            <i class="fas fa-file-excel"></i> <span class="hidden md:inline">Export Excel</span>
+                        </button>
+                        <button onclick="toggleModal()" class="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200">
+                            + Tambah Akun
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Search & Filter -->
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex gap-4 items-center">
+                    <div class="relative flex-1">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                            <i class="fas fa-search"></i>
+                        </span>
+                        <input type="text" id="searchInput" onkeyup="filterAccounts()" placeholder="Cari Kode Akun atau Gmail..." class="block w-full pl-10 pr-3 py-2 bg-slate-50 border border-transparent rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                    </div>
+                    <button onclick="fetchAccounts()" class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+
+                <!-- Accounts Grid -->
+                <div id="accountsList" class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                    <div class="col-span-full text-center py-20 text-slate-400">
+                        <i class="fas fa-spinner fa-spin text-3xl mb-4"></i>
+                        <p>Memuat data akun...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Statistics Section -->
+            <section id="statsSection" class="section space-y-8">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Analisis Penjualan</h2>
+                    <p class="text-slate-500">Data mendalam performa toko Anda.</p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                        <h4 class="font-bold text-slate-800 mb-6">Distribusi Harga</h4>
+                        <div class="h-80">
+                            <canvas id="priceChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-center">
+                        <div class="space-y-6">
+                            <div class="flex justify-between items-center p-4 bg-slate-50 rounded-2xl">
+                                <span class="text-slate-600 font-medium">Total Pengeluaran</span>
+                                <span class="font-bold text-slate-800" id="statTotalInvestment">Rp0</span>
+                            </div>
+                            <div class="flex justify-between items-center p-4 bg-blue-50 rounded-2xl text-blue-700">
+                                <span class="font-medium">Potensi Pendapatan</span>
+                                <span class="font-bold" id="statPotentialRevenue">Rp0</span>
+                            </div>
+                            <div class="flex justify-between items-center p-4 bg-emerald-50 rounded-2xl text-emerald-700 border border-emerald-100">
+                                <span class="font-medium">Margin Keuntungan (ROI)</span>
+                                <span class="font-bold" id="statROI">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Cropper Section -->
+            <section id="cropperSection" class="section space-y-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-800">AI Skin Scanner</h2>
+                        <p class="text-slate-500">Gunakan AI untuk mendeteksi dan memotong semua kartu skin secara otomatis.</p>
+                    </div>
+                    <div id="scannerStatus" class="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
+                        <i class="fas fa-check-circle"></i> <span>AI AUTO-SCAN ACTIVE</span>
+                    </div>
+                </div>
+
+                <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 space-y-6">
+                    <div id="dropZone" class="border-2 border-dashed border-slate-200 rounded-3xl p-12 text-center hover:border-blue-400 transition-all cursor-pointer group">
+                        <input type="file" id="imageInput" accept="image/*" class="hidden">
+                        <div class="bg-blue-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-600 group-hover:scale-110 transition-transform">
+                            <i class="fas fa-magic text-2xl"></i>
+                        </div>
+                        <p class="text-slate-600 font-bold">Upload Screenshot Koleksi Skin</p>
+                        <p class="text-slate-400 text-sm mt-1">AI akan memindai dan memotong otomatis setiap kartu skin</p>
+                    </div>
+
+                    <!-- Scan Results Area -->
+                    <div id="scanResults" class="hidden space-y-8">
+                        <div class="flex justify-between items-center">
+                            <h4 class="font-bold text-slate-800"><span id="detectedCount">0</span> Skin Terdeteksi</h4>
+                            <div class="flex gap-2">
+                                <button onclick="resetScanner()" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-200 transition">
+                                    Reset
+                                </button>
+                                <button onclick="downloadAllDetected()" class="px-6 py-2 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-lg shadow-blue-100">
+                                    Download Semua
+                                </button>
+                            </div>
+                        </div>
+                        <div id="detectedSkinsGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                            <!-- Detected skin canvases will be injected here -->
+                        </div>
+                    </div>
+
+                    <!-- Manual Cropper Area (Fallback) -->
+                    <div id="cropperArea" class="hidden space-y-6">
+                        <div class="rounded-2xl overflow-hidden bg-slate-900 shadow-inner">
+                            <img id="imageToCrop" class="max-w-full">
+                        </div>
+                        <div class="flex flex-wrap gap-4 justify-center">
+                            <button onclick="rotateImage(-90)" class="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition">
+                                <i class="fas fa-undo"></i>
+                            </button>
+                            <button onclick="rotateImage(90)" class="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition">
+                                <i class="fas fa-redo"></i>
+                            </button>
+                            <button onclick="cropAndDownload()" class="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-100">
+                                Potong & Download
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Modal Form -->
+        <div id="modal" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-[100] backdrop-blur-sm">
+            <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 transform transition-all">
+                <div class="bg-white p-6 border-b border-slate-100 flex justify-between items-center">
+                    <h2 id="modalTitle" class="text-xl font-bold text-slate-800">Tambah Akun Baru</h2>
+                    <button onclick="toggleModal()" class="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-xl transition-all">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="accountForm" class="p-6 space-y-5">
+                    <input type="hidden" id="editOriginalKode">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="col-span-2 md:col-span-1">
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">Kode Akun</label>
+                            <input type="text" name="Kode Akun" id="inputKode" required placeholder="ML-XXXX" class="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                        </div>
+                        <div class="col-span-2 md:col-span-1">
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">Keterangan</label>
+                            <select name="Keterangan" class="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all appearance-none bg-no-repeat bg-[right_1rem_center] bg-[length:1em_1em]" style="background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C/polyline%3E%3C/svg%3E')">
+                                <option value="Ready">Ready</option>
+                                <option value="Sold">Sold</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Gmail</label>
+                        <input type="email" name="Gmail" required placeholder="example@gmail.com" class="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">Pass Gmail</label>
+                            <input type="text" name="Password Gmail" required class="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">Pass ML</label>
+                            <input type="text" name="Password ML" required class="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">Harga Beli</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">Rp</span>
+                                <input type="number" name="Harga Beli" required class="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1">Harga Jual</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-sm">Rp</span>
+                                <input type="number" name="Harga Jual" required class="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="pt-4">
+                        <button type="submit" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
+                            Simpan Perubahan
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let accounts = [];
+        let inventoryChart = null;
+        let priceChart = null;
+        let cropper = null;
+
+        // Smart Skin Detection Algorithm (OpenCV-free)
+        function processAutoScan(imageSrc) {
+            const scanResults = document.getElementById('scanResults');
+            const detectedSkinsGrid = document.getElementById('detectedSkinsGrid');
+            const dropZone = document.getElementById('dropZone');
+            
+            const img = new Image();
+            img.onload = () => {
+                Swal.fire({ 
+                    title: 'AI Memindai Gambar...', 
+                    text: 'Menganalisis layout grid skin',
+                    allowOutsideClick: false, 
+                    didOpen: () => Swal.showLoading(),
+                    customClass: { popup: 'rounded-3xl' }
+                });
+
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+
+                // Grid Detection Logic kustom untuk UI Mobile Legends
+                const gridRows = 2;
+                const gridCols = 5;
+                
+                // Koordinat relatif UI Mobile Legends (Koleksi Skin)
+                const startX = img.width * 0.23;
+                const startY = img.height * 0.26;
+                const gridWidth = img.width * 0.68;
+                const gridHeight = img.height * 0.65;
+                
+                const cellW = gridWidth / gridCols;
+                const cellH = gridHeight / gridRows;
+
+                detectedSkinsGrid.innerHTML = '';
+                let count = 0;
+
+                for (let row = 0; row < gridRows; row++) {
+                    for (let col = 0; col < gridCols; col++) {
+                        const x = startX + (col * cellW);
+                        const y = startY + (row * cellH);
+                        
+                        const padding = 5;
+                        const finalW = cellW - (padding * 2);
+                        const finalH = cellH - (padding * 2);
+
+                        const skinCanvas = document.createElement('canvas');
+                        skinCanvas.width = finalW;
+                        skinCanvas.height = finalH;
+                        const skinCtx = skinCanvas.getContext('2d');
+                        
+                        skinCtx.drawImage(img, x + padding, y + padding, finalW, finalH, 0, 0, finalW, finalH);
+                        
+                        const pixelData = skinCtx.getImageData(finalW/2, finalH/2, 1, 1).data;
+                        const brightness = (pixelData[0] + pixelData[1] + pixelData[2]) / 3;
+                        
+                        if (brightness > 20) {
+                            const container = document.createElement('div');
+                            container.className = 'relative group';
+                            container.appendChild(skinCanvas);
+                            
+                            const btn = document.createElement('button');
+                            btn.innerHTML = '<i class="fas fa-download"></i>';
+                            btn.className = 'absolute bottom-2 right-2 bg-blue-600 text-white w-8 h-8 rounded-lg flex items-center justify-center shadow-lg';
+                            btn.onclick = () => downloadCanvas(skinCanvas);
+                            container.appendChild(btn);
+                            
+                            detectedSkinsGrid.appendChild(container);
+                            count++;
+                        }
+                    }
+                }
+
+                Swal.close();
+                if (count > 0) {
+                    document.getElementById('detectedCount').innerText = count;
+                    dropZone.classList.add('hidden');
+                    scanResults.classList.remove('hidden');
+                    document.getElementById('cropperArea').classList.add('hidden');
+                } else {
+                    Swal.fire({ 
+                        icon: 'warning', 
+                        title: 'Gagal Scan Otomatis', 
+                        text: 'Layout tidak dikenali. Gunakan mode manual.',
+                        customClass: { popup: 'rounded-3xl' }
+                    });
+                    initManualCropper(imageSrc);
+                }
+            };
+            img.src = imageSrc;
+        }
+
+        // Inisialisasi Event Listeners
+        window.addEventListener('load', () => {
+            const imageInput = document.getElementById('imageInput');
+            const dropZone = document.getElementById('dropZone');
+            
+            if (dropZone && imageInput) {
+                dropZone.onclick = () => imageInput.click();
+                
+                imageInput.onchange = (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        processAutoScan(event.target.result);
+                    };
+                    reader.readAsDataURL(file);
+                };
+            }
+        });
+
+        function downloadCanvas(canvas) {
+            const link = document.createElement('a');
+            link.download = `Skin_ML_Auto_${Date.now()}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        function downloadAllDetected() {
+            const detectedSkinsGrid = document.getElementById('detectedSkinsGrid');
+            const canvases = detectedSkinsGrid.querySelectorAll('canvas');
+            canvases.forEach((c, i) => {
+                setTimeout(() => downloadCanvas(c), i * 300);
+            });
+        }
+
+        function resetScanner() {
+            document.getElementById('scanResults').classList.add('hidden');
+            document.getElementById('cropperArea').classList.add('hidden');
+            document.getElementById('dropZone').classList.remove('hidden');
+            document.getElementById('imageInput').value = '';
+        }
+
+        function initManualCropper(src) {
+            const img = document.getElementById('imageToCrop');
+            img.src = src;
+            document.getElementById('dropZone').classList.add('hidden');
+            document.getElementById('cropperArea').classList.remove('hidden');
+            if (cropper) cropper.destroy();
+            cropper = new Cropper(img, { viewMode: 1 });
+        }
+
+        // Auth Logic
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/auth-status');
+                const data = await response.json();
+                if (data.loggedIn) {
+                    showMainContent();
+                } else {
+                    showLoginPage();
+                }
+            } catch (error) {
+                showLoginPage();
+            }
+        }
+
+        function showMainContent() {
+            document.getElementById('loginPage').classList.add('hidden');
+            document.getElementById('mainContent').classList.remove('hidden');
+            document.getElementById('mainContent').classList.add('flex');
+            switchSection('dashboard');
+        }
+
+        function showLoginPage() {
+            document.getElementById('loginPage').classList.remove('hidden');
+            document.getElementById('mainContent').classList.add('hidden');
+            document.getElementById('mainContent').classList.remove('flex');
+        }
+
+        function switchSection(sectionId) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(sectionId + 'Section').classList.add('active');
+            
+            document.querySelectorAll('.sidebar-link').forEach(link => {
+                if (link.dataset.section === sectionId) link.classList.add('active');
+                else link.classList.remove('active');
+            });
+
+            if (sectionId === 'dashboard') fetchStats();
+            else if (sectionId === 'accounts') fetchAccounts();
+            else if (sectionId === 'stats') fetchStats();
+
+            if (window.innerWidth < 1024) {
+                const sidebar = document.getElementById('sidebar');
+                if (!sidebar.classList.contains('-translate-x-full')) toggleSidebar();
+            }
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('-translate-x-full');
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                if (response.ok) {
+                    showMainContent();
+                    Swal.fire({ icon: 'success', title: 'Selamat Datang!', timer: 1500, showConfirmButton: false, customClass: { popup: 'rounded-3xl' } });
+                } else {
+                    const data = await response.json();
+                    Swal.fire({ icon: 'error', title: 'Login Gagal', text: data.message, customClass: { popup: 'rounded-3xl' } });
+                }
+            } catch (error) {
+                Swal.fire({ icon: 'error', title: 'Kesalahan', text: 'Koneksi gagal', customClass: { popup: 'rounded-3xl' } });
+            }
+        });
+
+        async function handleLogout() {
+            await fetch('/api/logout', { method: 'POST' });
+            showLoginPage();
+        }
+
+        // Stats & AI Logic
+        async function fetchStats() {
+            try {
+                const response = await fetch('/api/stats');
+                if (response.status === 401) return showLoginPage();
+                const stats = await response.json();
+                
+                document.getElementById('statTotalAccounts').innerText = stats.totalAccounts;
+                document.getElementById('statReadyAccounts').innerText = stats.readyAccounts;
+                document.getElementById('statSoldAccounts').innerText = stats.soldAccounts;
+                document.getElementById('statTotalProfit').innerText = 'Rp' + stats.totalProfit.toLocaleString('id-ID');
+                
+                const inv = document.getElementById('statTotalInvestment');
+                const rev = document.getElementById('statPotentialRevenue');
+                const roi = document.getElementById('statROI');
+                
+                if (inv) inv.innerText = 'Rp' + stats.totalInvestment.toLocaleString('id-ID');
+                if (rev) rev.innerText = 'Rp' + stats.potentialRevenue.toLocaleString('id-ID');
+                if (roi) {
+                    const margin = stats.totalInvestment > 0 ? (stats.totalProfit / stats.totalInvestment * 100).toFixed(1) : 0;
+                    roi.innerText = margin + '%';
+                }
+
+                updateCharts(stats);
+                generateAIRecommendations(stats);
+            } catch (error) {}
+        }
+
+        function generateAIRecommendations(stats) {
+            const container = document.getElementById('aiRecommendations');
+            const recs = [];
+            const roi = stats.totalInvestment > 0 ? (stats.totalProfit / stats.totalInvestment * 100) : 0;
+            const readyRatio = stats.totalAccounts > 0 ? (stats.readyAccounts / stats.totalAccounts * 100) : 0;
+
+            if (readyRatio > 70) {
+                recs.push({ icon: 'fa-exclamation-triangle', color: 'text-orange-500', bg: 'bg-orange-50', title: 'Analisis Likuiditas', desc: `Terlalu banyak modal tertahan (${readyRatio.toFixed(0)}% stok ready). Secara ekonomi, perputaran uang Anda melambat.` });
+            } else if (readyRatio < 20 && stats.totalAccounts > 5) {
+                recs.push({ icon: 'fa-chart-line', color: 'text-emerald-500', bg: 'bg-emerald-50', title: 'Momentum Penjualan', desc: `Tingkat penjualan Anda sangat tinggi! Pasar sedang merespon positif harga Anda.` });
+            }
+
+            if (roi > 40) {
+                recs.push({ icon: 'fa-gem', color: 'text-indigo-500', bg: 'bg-indigo-50', title: 'Efisiensi Tinggi', desc: `ROI sebesar ${roi.toFixed(1)}% menunjukkan pemilihan aset yang sangat cerdas.` });
+            } else if (stats.totalInvestment > 2000000 && roi < 10) {
+                recs.push({ icon: 'fa-shield-alt', color: 'text-red-500', bg: 'bg-red-50', title: 'Evaluasi Risiko', desc: `Pengeluaran besar terdeteksi tapi profit real masih rendah. Coba turunkan harga pada stok lama.` });
+            }
+
+            if (recs.length < 2) recs.push({ icon: 'fa-robot', color: 'text-slate-500', bg: 'bg-slate-50', title: 'Mode Observasi', desc: "AI sedang mengumpulkan data transaksi untuk analisis ekonomi yang lebih akurat." });
+
+            container.innerHTML = recs.slice(0, 2).map(r => `
+                <div class="recommendation-card p-6 ${r.bg} rounded-3xl border border-slate-100 flex flex-col gap-3">
+                    <div class="flex items-center gap-3 ${r.color}">
+                        <div class="w-10 h-10 rounded-2xl bg-white flex items-center justify-center shadow-sm"><i class="fas ${r.icon} text-lg"></i></div>
+                        <span class="font-bold text-sm uppercase tracking-wider">${r.title}</span>
+                    </div>
+                    <p class="text-sm text-slate-600 leading-relaxed font-medium">${r.desc}</p>
+                </div>
+            `).join('');
+        }
+
+        function updateCharts(stats) {
+            const ctxInv = document.getElementById('inventoryChart').getContext('2d');
+            if (inventoryChart) inventoryChart.destroy();
+            inventoryChart = new Chart(ctxInv, {
+                type: 'doughnut',
+                data: { labels: ['Ready', 'Terjual'], datasets: [{ data: [stats.readyAccounts, stats.soldAccounts], backgroundColor: ['#3b82f6', '#f97316'], borderWidth: 0 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, cutout: '70%' }
+            });
+
+            const ctxPrice = document.getElementById('priceChart')?.getContext('2d');
+            if (ctxPrice) {
+                if (priceChart) priceChart.destroy();
+                priceChart = new Chart(ctxPrice, {
+                    type: 'bar',
+                    data: { labels: ['Pengeluaran', 'Potensi Jual', 'Profit'], datasets: [{ data: [stats.totalInvestment, stats.potentialRevenue + stats.totalProfit, stats.totalProfit], backgroundColor: ['#64748b', '#3b82f6', '#10b981'], borderRadius: 12 }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: (v) => 'Rp' + (v / 1000) + 'k' } } } }
+                });
+            }
+        }
+
+        function cropAndDownload() {
+            if (!cropper) return;
+            const canvas = cropper.getCroppedCanvas();
+            downloadCanvas(canvas);
+            Swal.fire({ icon: 'success', title: 'Berhasil!', timer: 1000, showConfirmButton: false });
+        }
+
+        function rotateImage(deg) { if (cropper) cropper.rotate(deg); }
+
+        // Common Logic
+        async function fetchAccounts() {
+            const res = await fetch('/api/accounts');
+            accounts = await res.json();
+            renderAccounts();
+        }
+
+        function renderAccounts(data = accounts) {
+            const list = document.getElementById('accountsList');
+            if (data.length === 0) { list.innerHTML = '<p class="col-span-full text-center py-20 text-slate-400">Data kosong.</p>'; return; }
+            list.innerHTML = data.map((acc, index) => {
+                const profit = (acc["Harga Jual"] || 0) - (acc["Harga Beli"] || 0);
+                return `
+                <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-all group">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="px-3 py-1 bg-slate-100 rounded-lg text-[10px] font-bold text-slate-500 uppercase">${acc["Kode Akun"]}</div>
+                        <span class="px-3 py-1 text-xs font-bold rounded-full ${acc.Keterangan==='Ready'?'bg-green-100 text-green-700':'bg-orange-100 text-orange-700'}">${acc.Keterangan}</span>
+                    </div>
+                    <h3 class="font-bold text-slate-800 truncate mb-4 text-lg">${acc.Gmail || '-'}</h3>
+                    <div class="space-y-3 mb-6">
+                        <div class="flex justify-between text-sm"><span class="text-slate-400">Pass Gmail</span><span class="font-semibold text-slate-700">${acc["Password Gmail"] || '-'}</span></div>
+                        <div class="flex justify-between text-sm"><span class="text-slate-400">Pass ML</span><span class="font-semibold text-slate-700">${acc["Password ML"] || '-'}</span></div>
+                        <div class="pt-3 border-t border-slate-50 space-y-2">
+                            <div class="flex justify-between text-xs"><span>Beli: Rp${(acc["Harga Beli"]||0).toLocaleString()}</span><span class="text-blue-600 font-bold">Jual: Rp${(acc["Harga Jual"]||0).toLocaleString()}</span></div>
+                            <div class="bg-slate-50 p-2 rounded-xl flex justify-between text-xs"><span>Potensi Profit</span><span class="font-bold ${profit>=0?'text-emerald-600':'text-red-600'}">Rp${profit.toLocaleString()}</span></div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button onclick="handleEditAccount(${index})" class="p-2 bg-slate-50 rounded-xl hover:bg-slate-100"><i class="fas fa-edit"></i></button>
+                        <button onclick="toggleStatus('${acc["Kode Akun"]}', '${acc.Keterangan}')" class="p-2 bg-slate-50 rounded-xl hover:bg-blue-50"><i class="fas fa-sync-alt"></i></button>
+                        <button onclick="copyAccountInfo('${acc["Kode Akun"]}')" class="p-2 bg-slate-50 rounded-xl hover:bg-green-50"><i class="fas fa-copy"></i></button>
+                        <button onclick="deleteAccount('${acc["Kode Akun"]}')" class="p-2 bg-slate-50 rounded-xl hover:bg-red-50"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function toggleModal() {
+            const modal = document.getElementById('modal');
+            if (modal.classList.contains('hidden')) {
+                document.getElementById('accountForm').reset();
+                document.getElementById('editOriginalKode').value = '';
+                modal.classList.replace('hidden', 'flex');
+            } else modal.classList.replace('flex', 'hidden');
+        }
+
+        function handleEditAccount(index) {
+            const acc = accounts[index];
+            const form = document.getElementById('accountForm');
+            form.elements["Kode Akun"].value = acc["Kode Akun"];
+            form.elements["Gmail"].value = acc.Gmail;
+            form.elements["Password Gmail"].value = acc["Password Gmail"];
+            form.elements["Password ML"].value = acc["Password ML"];
+            form.elements["Harga Beli"].value = acc["Harga Beli"];
+            form.elements["Harga Jual"].value = acc["Harga Jual"];
+            form.elements["Keterangan"].value = acc.Keterangan;
+            document.getElementById('editOriginalKode').value = acc["Kode Akun"];
+            toggleModal();
+        }
+
+        document.getElementById('accountForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = Object.fromEntries(new FormData(e.target));
+            const orig = document.getElementById('editOriginalKode').value;
+            const res = await fetch(orig ? `/api/accounts/${encodeURIComponent(orig)}` : '/api/accounts', {
+                method: orig ? 'PUT' : 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (res.ok) { toggleModal(); fetchAccounts(); fetchStats(); }
+        });
+
+        async function toggleStatus(k, s) {
+            await fetch(`/api/accounts/${encodeURIComponent(k)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ Keterangan: s==='Ready'?'Sold':'Ready' }) });
+            fetchAccounts(); fetchStats();
+        }
+
+        async function deleteAccount(k) {
+            if ((await Swal.fire({ title: 'Hapus?', showCancelButton: true })).isConfirmed) {
+                await fetch(`/api/accounts/${encodeURIComponent(k)}`, { method: 'DELETE' });
+                fetchAccounts(); fetchStats();
+            }
+        }
+
+        function copyAccountInfo(k) {
+            const acc = accounts.find(a => a["Kode Akun"] === k);
+            navigator.clipboard.writeText(`*INFO AKUN*\nKode: ${acc["Kode Akun"]}\nEmail: ${acc.Gmail}\nPass: ${acc["Password Gmail"]}`).then(() => Swal.fire({ icon: 'success', title: 'Copied!', timer: 800, showConfirmButton: false }));
+        }
+
+        async function downloadExcel() {
+            const res = await fetch('/api/export-excel');
+            const blob = await res.blob();
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `PanzzStore_${new Date().toISOString().split('T')[0]}.xlsx`;
+            a.click();
+        }
+
+        checkAuth();
+    </script>
+</body>
+</html>
